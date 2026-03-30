@@ -31,8 +31,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Pikafish binary path (in Docker container)
-const PIKAFISH_PATH = process.env.PIKAFISH_PATH || '/app/pikafish';
+// Pikafish binary path
+const PIKAFISH_PATH = process.env.PIKAFISH_PATH || path.join(__dirname, 'engine', 'pikafish');
 
 class PikafishEngine {
   constructor() {
