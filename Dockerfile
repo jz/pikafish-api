@@ -1,46 +1,20 @@
-# Multi-stage build: compile Pikafish, then run Node server
-
-# Stage 1: Build Pikafish for Linux
-FROM ubuntu:22.04 AS builder
-
-# Avoid interactive prompts during apt install
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    git \
-    wget \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /build
-
-# Clone Pikafish source
-RUN git clone --depth 1 https://github.com/official-pikafish/Pikafish.git .
-
-# Build from src directory
-WORKDIR /build/src
-
-# Build for Linux x86_64 (this also downloads the NNUE file)
-RUN make -j$(nproc) build ARCH=x86-64-modern COMP=gcc
-
-# Verify build succeeded
-RUN ./pikafish --help || echo "Build check"
-
-# Stage 2: Runtime image with Node.js
+# Simple deployment using pre-built Pikafish binary
 FROM node:18-slim
 
 WORKDIR /app
 
-# Install curl for healthcheck
+# Install curl for downloads and healthcheck
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Copy built Pikafish binary and NNUE file from builder
-COPY --from=builder /build/src/pikafish /app/pikafish
-COPY --from=builder /build/src/pikafish.nnue /app/pikafish.nnue
-
-# Make binary executable
-RUN chmod +x /app/pikafish
+# Download pre-built Pikafish binary (avx2 for best compatibility on modern servers)
+RUN curl -L -o /tmp/pikafish.7z https://github.com/official-pikafish/Pikafish/releases/download/Pikafish-2026-01-02/Pikafish.2026-01-02.7z && \
+    apt-get update && apt-get install -y p7zip-full && \
+    7z e /tmp/pikafish.7z -o/app Linux/pikafish-bmi2 pikafish.nnue -r && \
+    mv /app/pikafish-bmi2 /app/pikafish && \
+    chmod +x /app/pikafish && \
+    rm /tmp/pikafish.7z && \
+    apt-get remove -y p7zip-full && apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy Node.js app
 COPY package*.json ./
